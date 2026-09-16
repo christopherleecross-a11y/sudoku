@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sudoku</title>
+<style>
+  :root {
+    --bg: #f5f2ea;
+    --board-bg: #ffffff;
+    --line-thin: #c9c2b3;
+    --line-thick: #2b2b2b;
+    --text: #1e1e1e;
+    --given: #1e1e1e;
+    --user: #2c6ec4;
+    --hint: #16a34a;
+    --error: #dc2626;
+    --selected: #d7e6ff;
+    --peer: #ecf1f8;
+    --same-num: #ffe9b3;
+    --accent: #2c6ec4;
+    --btn-bg: #ffffff;
+    --btn-border: #c9c2b3;
+    --btn-hover: #eee7d3;
+    --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+  }
+
+  .app {
+    max-width: 620px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    margin: 0 0 4px;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .subtitle {
+    color: #6b6b6b;
+    font-size: 14px;
+    margin: 0;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+
+  .difficulty-group {
+    display: inline-flex;
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  .difficulty-group button {
+    background: transparent;
+    border: 0;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text);
+    border-right: 1px solid var(--btn-border);
+    transition: background 0.15s ease;
+  }
+
+  .difficulty-group button:last-child { border-right: 0; }
+
+  .difficulty-group button:hover { background: var(--btn-hover); }
+
+  .difficulty-group button.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  .btn {
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text);
+    box-shadow: var(--shadow);
+    transition: background 0.15s ease, transform 0.05s ease;
+  }
+
+  .btn:hover { background: var(--btn-hover); }
+  .btn:active { transform: translateY(1px); }
+
+  .status {
+    text-align: center;
+    min-height: 24px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: #555;
+  }
+
+  .status.win { color: var(--hint); font-weight: 700; font-size: 16px; }
+  .status.err { color: var(--error); }
+
+  .board-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    width: min(92vw, 540px);
+    aspect-ratio: 1 / 1;
+    background: var(--board-bg);
+    border: 3px solid var(--line-thick);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    user-select: none;
+  }
+
+  .cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(18px, 5vw, 28px);
+    font-weight: 500;
+    background: var(--board-bg);
+    border-right: 1px solid var(--line-thin);
+    border-bottom: 1px solid var(--line-thin);
+    cursor: pointer;
+    transition: background 0.1s ease;
+    color: var(--user);
+    position: relative;
+  }
+
+  .cell:nth-child(9n) { border-right: 0; }
+  .cell.row-9 { border-bottom: 0; }
+
+  .cell.thick-right { border-right: 2px solid var(--line-thick); }
+  .cell.thick-bottom { border-bottom: 2px solid var(--line-thick); }
+
+  .cell.given {
+    color: var(--given);
+    font-weight: 700;
+    cursor: default;
+  }
+
+  .cell.hint {
+    color: var(--hint);
+    font-weight: 700;
+    animation: pop 0.35s ease;
+  }
+
+  .cell.error {
+    color: var(--error);
+  }
+
+  .cell.selected {
+    background: var(--selected);
+  }
+
+  .cell.peer {
+    background: var(--peer);
+  }
+
+  .cell.same-num {
+    background: var(--same-num);
+  }
+
+  @keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.25); }
+    100% { transform: scale(1); }
+  }
+
+  .numpad {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    max-width: 540px;
+    margin: 0 auto 12px;
+  }
+
+  .numpad button {
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    padding: 14px 0;
+    font-size: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text);
+    box-shadow: var(--shadow);
+    transition: background 0.1s ease, transform 0.05s ease;
+  }
+
+  .numpad button:hover { background: var(--btn-hover); }
+  .numpad button:active { transform: translateY(1px); }
+  .numpad button.erase { color: var(--error); }
+
+  footer {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 12px;
+    color: #999;
+  }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 26px; }
+    .difficulty-group button { padding: 8px 12px; font-size: 13px; }
+    .btn { padding: 8px 12px; font-size: 13px; }
+    .numpad button { padding: 12px 0; font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Sudoku</h1>
+    <p class="subtitle">Fill the grid so every row, column and 3&times;3 box contains 1&ndash;9</p>
+  </header>
+
+  <div class="controls">
+    <div class="difficulty-group" role="group" aria-label="Difficulty">
+      <button data-diff="easy" class="active">Easy</button>
+      <button data-diff="medium">Medium</button>
+      <button data-diff="hard">Hard</button>
+    </div>
+    <button class="btn" id="new-game">New Game</button>
+    <button class="btn" id="hint">Hint</button>
+    <button class="btn" id="check">Check</button>
+  </div>
+
+  <div class="status" id="status">Pick a cell, then type or tap a number.</div>
+
+  <div class="board-wrap">
+    <div class="board" id="board" role="grid" aria-label="Sudoku board"></div>
+  </div>
+
+  <div class="numpad" id="numpad">
+    <button data-num="1">1</button>
+    <button data-num="2">2</button>
+    <button data-num="3">3</button>
+    <button data-num="4">4</button>
+    <button data-num="5">5</button>
+    <button data-num="6">6</button>
+    <button data-num="7">7</button>
+    <button data-num="8">8</button>
+    <button data-num="9">9</button>
+    <button data-num="0" class="erase">Erase</button>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Sudoku core ----------
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function emptyGrid() {
+    return Array.from({ length: 9 }, () => Array(9).fill(0));
+  }
+
+  function cloneGrid(g) {
+    return g.map(row => row.slice());
+  }
+
+  function isSafe(g, r, c, n) {
+    for (let i = 0; i < 9; i++) {
+      if (g[r][i] === n) return false;
+      if (g[i][c] === n) return false;
+    }
+    const br = Math.floor(r / 3) * 3;
+    const bc = Math.floor(c / 3) * 3;
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        if (g[br + i][bc + j] === n) return false;
+      }
+    }
+    return true;
+  }
+
+  // Fills grid via randomised backtracking, producing a valid full solution.
+  function fillGrid(g) {
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (g[r][c] === 0) {
+          const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+          for (const n of nums) {
+            if (isSafe(g, r, c, n)) {
+              g[r][c] = n;
+              if (fillGrid(g)) return true;
+              g[r][c] = 0;
+            }
+          }
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function generateSolution() {
+    const g = emptyGrid();
+    fillGrid(g);
+    return g;
+  }
+
+  // Count solutions to a partial grid, stopping at `limit` (default 2).
+  // Returns min(actual, limit). Used to enforce uniqueness while removing cells.
+  function countSolutions(g, limit) {
+    limit = limit || 2;
+    let count = 0;
+    (function solve() {
+      if (count >= limit) return;
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (g[r][c] === 0) {
+            for (let n = 1; n <= 9; n++) {
+              if (isSafe(g, r, c, n)) {
+                g[r][c] = n;
+                solve();
+                g[r][c] = 0;
+                if (count >= limit) return;
+              }
+            }
+            return;
+          }
+        }
+      }
+      count++;
+    })();
+    return count;
+  }
+
+  // Remove up to `targetHoles` cells while keeping the puzzle uniquely solvable.
+  function makePuzzle(solution, targetHoles) {
+    const puzzle = cloneGrid(solution);
+    const cells = [];
+    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) cells.push([r, c]);
+    shuffle(cells);
+    let removed = 0;
+    for (const [r, c] of cells) {
+      if (removed >= targetHoles) break;
+      const saved = puzzle[r][c];
+      puzzle[r][c] = 0;
+      if (countSolutions(puzzle, 2) !== 1) {
+        puzzle[r][c] = saved; // ambiguity — put it back
+      } else {
+        removed++;
+      }
+    }
+    return puzzle;
+  }
+
+  const DIFFICULTY_HOLES = {
+    easy: 40,
+    medium: 50,
+    hard: 58
+  };
+
+  // ---------- Game state ----------
+
+  const state = {
+    solution: null,
+    puzzle: null,     // starting givens (0 = blank)
+    board: null,      // current player state
+    selected: null,   // {r, c}
+    difficulty: "easy",
+    hintCells: new Set(),   // "r,c" of cells filled by hint/cheat
+    finished: false
+  };
+
+  // ---------- Rendering ----------
+
+  const boardEl = document.getElementById("board");
+  const statusEl = document.getElementById("status");
+
+  function buildBoard() {
+    boardEl.innerHTML = "";
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.dataset.r = r;
+        cell.dataset.c = c;
+        if (r === 8) cell.classList.add("row-9");
+        if (c === 2 || c === 5) cell.classList.add("thick-right");
+        if (r === 2 || r === 5) cell.classList.add("thick-bottom");
+        cell.addEventListener("click", () => selectCell(r, c));
+        boardEl.appendChild(cell);
+      }
+    }
+  }
+
+  function cellAt(r, c) {
+    return boardEl.children[r * 9 + c];
+  }
+
+  function render() {
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        const el = cellAt(r, c);
+        const v = state.board[r][c];
+        el.textContent = v === 0 ? "" : v;
+        el.classList.remove("given", "hint", "error", "selected", "peer", "same-num");
+        if (state.puzzle[r][c] !== 0) el.classList.add("given");
+        if (state.hintCells.has(r + "," + c)) el.classList.add("hint");
+      }
+    }
+    highlightPeers();
+    if (state.selected) {
+      const { r, c } = state.selected;
+      cellAt(r, c).classList.add("selected");
+    }
+  }
+
+  function highlightPeers() {
+    if (!state.selected) return;
+    const { r, c } = state.selected;
+    const targetVal = state.board[r][c];
+    const br = Math.floor(r / 3) * 3;
+    const bc = Math.floor(c / 3) * 3;
+    for (let rr = 0; rr < 9; rr++) {
+      for (let cc = 0; cc < 9; cc++) {
+        const el = cellAt(rr, cc);
+        if (rr === r || cc === c ||
+            (rr >= br && rr < br + 3 && cc >= bc && cc < bc + 3)) {
+          if (!(rr === r && cc === c)) el.classList.add("peer");
+        }
+        if (targetVal !== 0 && state.board[rr][cc] === targetVal && !(rr === r && cc === c)) {
+          el.classList.add("same-num");
+        }
+      }
+    }
+  }
+
+  function selectCell(r, c) {
+    state.selected = { r, c };
+    render();
+  }
+
+  // ---------- Actions ----------
+
+  function newGame(difficulty) {
+    state.difficulty = difficulty;
+    const solution = generateSolution();
+    const puzzle = makePuzzle(solution, DIFFICULTY_HOLES[difficulty]);
+    state.solution = solution;
+    state.puzzle = puzzle;
+    state.board = cloneGrid(puzzle);
+    state.hintCells = new Set();
+    state.selected = null;
+    state.finished = false;
+    setStatus("New " + difficulty + " puzzle. Good luck!", "");
+    render();
+  }
+
+  function enterNumber(n) {
+    if (state.finished) return;
+    if (!state.selected) {
+      setStatus("Pick a cell first.", "");
+      return;
+    }
+    const { r, c } = state.selected;
+    if (state.puzzle[r][c] !== 0) {
+      setStatus("That cell is a given — pick another.", "");
+      return;
+    }
+    state.board[r][c] = n;
+    state.hintCells.delete(r + "," + c);
+    render();
+    if (isComplete()) {
+      state.finished = true;
+      setStatus("Solved! Nice work.", "win");
+    }
+  }
+
+  function isComplete() {
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (state.board[r][c] !== state.solution[r][c]) return false;
+      }
+    }
+    return true;
+  }
+
+  function giveHint() {
+    if (state.finished) return;
+    // Prefer hinting the currently selected empty cell.
+    let target = null;
+    if (state.selected) {
+      const { r, c } = state.selected;
+      if (state.board[r][c] === 0 || state.board[r][c] !== state.solution[r][c]) {
+        target = { r, c };
+      }
+    }
+    if (!target) {
+      const empties = [];
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (state.board[r][c] !== state.solution[r][c]) {
+            empties.push({ r, c });
+          }
+        }
+      }
+      if (empties.length === 0) return;
+      target = empties[Math.floor(Math.random() * empties.length)];
+    }
+    state.board[target.r][target.c] = state.solution[target.r][target.c];
+    state.hintCells.add(target.r + "," + target.c);
+    state.selected = target;
+    render();
+    if (isComplete()) {
+      state.finished = true;
+      setStatus("Solved (with a little help)!", "win");
+    } else {
+      setStatus("Hint dropped in.", "");
+    }
+  }
+
+  function checkProgress() {
+    let wrong = 0;
+    let filled = 0;
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        const v = state.board[r][c];
+        if (v !== 0) filled++;
+        if (v !== 0 && v !== state.solution[r][c]) wrong++;
+      }
+    }
+    if (wrong > 0) {
+      setStatus(wrong + " cell" + (wrong === 1 ? "" : "s") + " wrong so far.", "err");
+    } else if (filled === 81) {
+      setStatus("All correct — solved!", "win");
+      state.finished = true;
+    } else {
+      setStatus("Looking good — nothing wrong yet.", "");
+    }
+  }
+
+  function setStatus(msg, kind) {
+    statusEl.textContent = msg;
+    statusEl.classList.remove("win", "err");
+    if (kind) statusEl.classList.add(kind);
+  }
+
+  // ---------- Secret cheat ----------
+  // Type "wizard" anywhere on the page to fill in every remaining cell
+  // with the correct answer. Shhh.
+  const CHEAT_WORD = "cheat";
+  let cheatBuffer = "";
+
+  function runCheat() {
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (state.board[r][c] !== state.solution[r][c]) {
+          state.board[r][c] = state.solution[r][c];
+          state.hintCells.add(r + "," + c);
+        }
+      }
+    }
+    state.finished = true;
+    render();
+    setStatus("Cheat activated — puzzle solved.", "win");
+  }
+
+  // ---------- Wiring ----------
+
+  document.querySelectorAll(".difficulty-group button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".difficulty-group button")
+        .forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      newGame(btn.dataset.diff);
+    });
+  });
+
+  document.getElementById("new-game").addEventListener("click", () => {
+    newGame(state.difficulty);
+  });
+
+  document.getElementById("hint").addEventListener("click", giveHint);
+  document.getElementById("check").addEventListener("click", checkProgress);
+
+  document.querySelectorAll("#numpad button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      enterNumber(parseInt(btn.dataset.num, 10));
+    });
+  });
+
+  document.addEventListener("keydown", (e) => {
+    // Cheat detection: track typed letters, ignore modifiers.
+    if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+      cheatBuffer = (cheatBuffer + e.key.toLowerCase()).slice(-CHEAT_WORD.length);
+      if (cheatBuffer === CHEAT_WORD) {
+        cheatBuffer = "";
+        runCheat();
+        return;
+      }
+    }
+
+    if (state.finished) return;
+
+    if (state.selected) {
+      const { r, c } = state.selected;
+      if (e.key >= "1" && e.key <= "9") {
+        enterNumber(parseInt(e.key, 10));
+      } else if (e.key === "0" || e.key === "Backspace" || e.key === "Delete") {
+        enterNumber(0);
+      } else if (e.key === "ArrowUp" && r > 0) {
+        selectCell(r - 1, c);
+      } else if (e.key === "ArrowDown" && r < 8) {
+        selectCell(r + 1, c);
+      } else if (e.key === "ArrowLeft" && c > 0) {
+        selectCell(r, c - 1);
+      } else if (e.key === "ArrowRight" && c < 8) {
+        selectCell(r, c + 1);
+      }
+    } else if (e.key >= "1" && e.key <= "9") {
+      // No cell selected — highlight matching numbers by picking the first one.
+    }
+  });
+
+  // ---------- Boot ----------
+
+  buildBoard();
+  newGame("easy");
+})();
+</script>
+</body>
+</html>
