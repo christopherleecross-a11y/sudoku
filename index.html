@@ -508,7 +508,7 @@
     render();
     if (isComplete()) {
       state.finished = true;
-      setStatus("Solved! Nice work.", "win");
+      setStatus("SOLVED!", "win");
     }
   }
 
@@ -568,7 +568,7 @@
     if (wrong > 0) {
       setStatus(wrong + " cell" + (wrong === 1 ? "" : "s") + " wrong so far.", "err");
     } else if (filled === 81) {
-      setStatus("All correct — solved!", "win");
+      setStatus("SOLVED!", "win");
       state.finished = true;
     } else {
       setStatus("Looking good — nothing wrong yet.", "");
