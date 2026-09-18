@@ -224,6 +224,42 @@
   .numpad button:hover { background: var(--btn-hover); }
   .numpad button:active { transform: translateY(1px); }
   .numpad button.erase { color: var(--error); }
+  .numpad button.used {
+    opacity: 0.28;
+    color: #888;
+  }
+  .numpad button.used:hover { background: var(--btn-bg); }
+
+  .settings-row {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: #555;
+  }
+
+  .toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    padding: 6px 10px;
+    border-radius: 8px;
+    transition: background 0.1s ease;
+  }
+
+  .toggle:hover { background: rgba(0,0,0,0.04); }
+
+  .toggle input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--accent);
+    margin: 0;
+  }
 
   footer {
     text-align: center;
@@ -256,6 +292,13 @@
     <button class="btn" id="new-game">New Game</button>
     <button class="btn" id="hint">Hint</button>
     <button class="btn" id="check">Check</button>
+  </div>
+
+  <div class="settings-row">
+    <label class="toggle">
+      <input type="checkbox" id="warn-toggle">
+      <span>Warn me when I place a wrong number</span>
+    </label>
   </div>
 
   <div class="status" id="status">Pick a cell, then type or tap a number.</div>
@@ -404,8 +447,14 @@
     selected: null,   // {r, c}
     difficulty: "easy",
     hintCells: new Set(),   // "r,c" of cells filled by hint/cheat
-    finished: false
+    finished: false,
+    warnOnWrong: false      // if true, mark wrong entries in red as they happen
   };
+
+  // Load persisted setting (fails silently in restricted environments).
+  try {
+    if (localStorage.getItem("sudoku-warn") === "1") state.warnOnWrong = true;
+  } catch (e) { /* ignore */ }
 
   // ---------- Rendering ----------
 
@@ -449,6 +498,35 @@
       const { r, c } = state.selected;
       cellAt(r, c).classList.add("selected");
     }
+    if (state.warnOnWrong) markErrors();
+    updateNumpad();
+  }
+
+  function markErrors() {
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        const el = cellAt(r, c);
+        const v = state.board[r][c];
+        if (v !== 0 && state.puzzle[r][c] === 0 && v !== state.solution[r][c]) {
+          el.classList.add("error");
+        }
+      }
+    }
+  }
+
+  function updateNumpad() {
+    const counts = new Array(10).fill(0);
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        counts[state.board[r][c]]++;
+      }
+    }
+    document.querySelectorAll("#numpad button").forEach(btn => {
+      const n = parseInt(btn.dataset.num, 10);
+      if (n >= 1 && n <= 9) {
+        btn.classList.toggle("used", counts[n] >= 9);
+      }
+    });
   }
 
   function highlightPeers() {
@@ -618,6 +696,14 @@
 
   document.getElementById("hint").addEventListener("click", giveHint);
   document.getElementById("check").addEventListener("click", checkProgress);
+
+  const warnToggle = document.getElementById("warn-toggle");
+  warnToggle.checked = state.warnOnWrong;
+  warnToggle.addEventListener("change", () => {
+    state.warnOnWrong = warnToggle.checked;
+    try { localStorage.setItem("sudoku-warn", warnToggle.checked ? "1" : "0"); } catch (e) {}
+    render();
+  });
 
   document.querySelectorAll("#numpad button").forEach(btn => {
     btn.addEventListener("click", () => {
